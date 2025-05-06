@@ -66,31 +66,19 @@
     job: "/usr/bin/whoami >> /tmp/cron_output.txt"
     state: present
 
-- name: Определить список репозиториев
-  set_fact:
-    repo_urls:
-      - "https://github.com/expressjs/express.git"
-      - "https://github.com/moment/moment.git"
-      - "https://github.com/chalk/chalk.git"
-
 - name: 8.1. Клонировать репозитории
   git:
     repo: "{{ item }}"
     dest: "/home/vagrant/repos/{{ item | basename | regex_replace('\\.git$', '') }}"
-    force: yes
-  loop: "{{ repo_urls }}"
+  with_items:
+   
+    - "https://github.com/facebook/react.git"
   become: false
 
 - name: 8.2 Установить зависимости для репозиториев
-  shell: "npm install"
+  shell: "npm install --legacy-peer-deps"
   args:
     chdir: "/home/vagrant/repos/{{ item | basename | regex_replace('\\.git$', '') }}"
-  loop: "{{ repo_urls }}"
+  with_items:
+    - "https://github.com/expressjs/express.git"
   become: false
-
-- name: 9. Перезапустить демон cron
-  ansible.builtin.service:
-    name: cron
-    state: restarted
-  become: true
-
