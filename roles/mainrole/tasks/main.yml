@@ -1,0 +1,83 @@
+- name: 1. Записать время и имя пользователя в файл в домашней директории
+  become: false
+  shell: "echo $(date) $(whoami) >> ~/ansible_info.txt"
+
+- name: Установить emacs версии {{ emacs_version }}
+  apt:
+    name: "emacs={{ emacs_version }}"
+    state: present
+
+- name: 3. Добавить внешний репозиторий Node.js 18.x
+  ansible.builtin.apt_key:
+    url: https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key
+    state: present
+
+- name: Добавить источник Node.js 18.x
+  ansible.builtin.apt_repository:
+    repo: deb https://deb.nodesource.com/node_18.x nodistro main
+    filename: nodesource
+    state: present
+
+- name: Установить Node.js из внешнего репозитория
+  apt:
+    name: nodejs
+    state: present
+    update_cache: yes
+
+- name: 4. Изменить строку в конфиге UFW (MANAGE_BUILTINS)
+  lineinfile:
+    path: /etc/default/ufw
+    regexp: '^MANAGE_BUILTINS='
+    line: 'MANAGE_BUILTINS=yes'
+
+- name: 5.1. Сделать резервную копию конфигурационного файла
+  copy:
+    src: /etc/default/ufw
+    dest: "/etc/default/ufw.{{ lookup('pipe', 'date +%Y%m%d%H%M%S') }}.bak"
+    remote_src: yes
+
+- name: 5.2. Заменить конфигурационный файл на шаблон Jinja2
+  template:
+    src: ufw.j2
+    dest: /etc/default/ufw
+    mode: '0644'
+
+- name: 6.1 Проверить, существует ли файл
+  stat:
+    path: /tmp/sample.txt
+  register: sample_file
+
+- name: 6.2 Скачать файл с интернет-ресурса, если его нет
+  get_url:
+    url: https://www.w3.org/TR/PNG/iso_8859-1.txt
+    dest: /tmp/sample.txt
+    mode: '0644'
+  when: not sample_file.stat.exists
+  register: download_result
+  retries: 3
+  delay: 5
+  until: download_result is succeeded
+
+- name: 7. Добавить крон-задачу
+  cron:
+    name: "Cron Job"
+    minute: "20"
+    hour: "18"
+    job: "/usr/bin/whoami >> /tmp/cron_output.txt"
+    state: present
+
+-  name: 8.1. Клонировать репозитории
+   git:
+     repo: "{{ item }}"
+     dest: "/home/vagrant/repos/{{ item | basename | regex_replace('\\.git$', '') }}"
+   with_items:
+     - "https://github.com/expressjs/express.git"
+   become: false
+
+- name: 8.2 Установить зависимости для репозиториев
+  shell: "npm install"
+  args:
+    chdir: "/home/vagrant/repos/{{ item | basename | regex_replace('\\.git$', '') }}"
+  with_items:
+    - "https://github.com/expressjs/express.git"
+  become: false
